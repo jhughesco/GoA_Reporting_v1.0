@@ -1,0 +1,85 @@
+-- ==========================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Called by sp_SvcLog_1.Create_1.Master
+--              Create Views, see addin_SvcLogTableStructures for specifications.
+-- ==========================================================================================
+CREATE or ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_6.View]
+    @TableName NVARCHAR(200),
+    @TableNamePrefix NVARCHAR(200),
+    @TableList NVARCHAR(MAX) = NULL,
+    @ViewDefinition NVARCHAR(MAX),
+    @TableDistroLvl INT,
+    @Run_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @SQL NVARCHAR(MAX);
+    DECLARE @ActionMsg NVARCHAR(255);
+    DECLARE @ViewName NVARCHAR(255);
+
+    IF @TableDistroLvl = 0
+    BEGIN
+        SET @SQL = REPLACE(REPLACE(@ViewDefinition, '{0}', @TableNamePrefix), '({1})', @TableNamePrefix);
+        SET @ViewName = QUOTENAME(CONCAT('vw_', @TableNamePrefix))
+        SET @ActionMsg = CONCAT('CREATE: ', QUOTENAME(@TableName),' added to View.');
+
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            IF @ReturnCode = 0
+            BEGIN
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @ViewName,
+                                              @RowsAffected = @ReturnCode,
+                                              @Action = @ActionMsg,
+                                              @ErrorCode = NULL,
+                                              @ErrorMessage = NULL;
+                PRINT 'View Maint - ' + QUOTENAME(CONCAT('vw_', @TableNamePrefix)) + ' ALTERED/CREATED.  Added: '
+                      + QUOTENAME(@TableName) + ' to view successfully.';
+            END;
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+            PRINT @SQL;
+            PRINT 'View Maint -  Error occurred while creating view: ' + @ErrorMessage;
+        END CATCH;
+    END
+    ELSE
+    BEGIN
+        SET @SQL = REPLACE(REPLACE(@ViewDefinition, '{0}', @TableNamePrefix), '{1}', @TableList);
+        SET @ViewName = QUOTENAME(CONCAT('vw_', @TableNamePrefix))
+        SET @ActionMsg = CONCAT('CREATE: ', QUOTENAME(@TableName),' added to ', QUOTENAME(CONCAT('vw_', @TableNamePrefix)));
+
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            IF @ReturnCode = 0
+            BEGIN
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @ViewName,
+                                              @RowsAffected = @ReturnCode,
+                                              @Action = @ActionMsg,
+                                              @ErrorCode = NULL,
+                                              @ErrorMessage = NULL;
+                PRINT 'View Maint - ' + QUOTENAME(CONCAT('vw_', @TableNamePrefix)) + ' ALTERED/CREATED.  Added: '
+                      + QUOTENAME(@TableName) + ' to view successfully.';
+            END;
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+            PRINT @SQL;
+            PRINT 'View Maint -  Error occurred while creating view: ' + @ErrorMessage;
+        END CATCH;
+    END;
+END;
+GO

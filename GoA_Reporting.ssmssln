@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# SQL Server Management Studio Solution File, Format Version 19.00
+VisualStudioVersion = 15.0.28307.421
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{4F2E2C19-372F-40D8-9FA7-9D2138C6997A}") = "DatabaseSettings", "DatabaseSettings\DatabaseSettings.ssmssqlproj", "{AF571918-D946-4BB9-8857-2BA64FC31C9F}"
+EndProject
+Project("{4F2E2C19-372F-40D8-9FA7-9D2138C6997A}") = "Tables", "Tables\Tables.ssmssqlproj", "{062B60C0-A125-44B4-8E70-2156D333CC19}"
+EndProject
+Project("{4F2E2C19-372F-40D8-9FA7-9D2138C6997A}") = "StoredProcedures", "StoredProcedures\StoredProcedures.ssmssqlproj", "{D514BE17-B729-4104-9B01-78ECAF82618F}"
+EndProject
+Project("{4F2E2C19-372F-40D8-9FA7-9D2138C6997A}") = "Functions", "Functions\Functions.ssmssqlproj", "{164050FD-B7DC-4046-BC46-ECCF520C793B}"
+EndProject
+Project("{4F2E2C19-372F-40D8-9FA7-9D2138C6997A}") = "ReportQueries", "ReportQueries\ReportQueries.ssmssqlproj", "{D0D19239-96AF-4B80-8AC0-86075039B393}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Default|SQL = Default|SQL
+		GoA_Reporting|SQL = GoA_Reporting|SQL
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AF571918-D946-4BB9-8857-2BA64FC31C9F}.Default|SQL.ActiveCfg = Default
+		{AF571918-D946-4BB9-8857-2BA64FC31C9F}.GoA_Reporting|SQL.ActiveCfg = Default
+		{062B60C0-A125-44B4-8E70-2156D333CC19}.Default|SQL.ActiveCfg = Default
+		{062B60C0-A125-44B4-8E70-2156D333CC19}.GoA_Reporting|SQL.ActiveCfg = Default
+		{D514BE17-B729-4104-9B01-78ECAF82618F}.Default|SQL.ActiveCfg = Default
+		{D514BE17-B729-4104-9B01-78ECAF82618F}.GoA_Reporting|SQL.ActiveCfg = Default
+		{164050FD-B7DC-4046-BC46-ECCF520C793B}.Default|SQL.ActiveCfg = Default
+		{164050FD-B7DC-4046-BC46-ECCF520C793B}.GoA_Reporting|SQL.ActiveCfg = Default
+		{EBB969B9-F542-44DD-8639-FEF606BC5E51}.Default|SQL.ActiveCfg = Default
+		{EBB969B9-F542-44DD-8639-FEF606BC5E51}.GoA_Reporting|SQL.ActiveCfg = Default
+		{D0D19239-96AF-4B80-8AC0-86075039B393}.Default|SQL.ActiveCfg = Default
+		{D0D19239-96AF-4B80-8AC0-86075039B393}.GoA_Reporting|SQL.ActiveCfg = Default
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {76131194-8017-4C1F-A16E-B2055218084A}
+	EndGlobalSection
+EndGlobal

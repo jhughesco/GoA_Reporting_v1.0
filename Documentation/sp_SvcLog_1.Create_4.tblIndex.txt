@@ -1,0 +1,120 @@
+-- ==========================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Called by sp_SvcLog_1.Create_1.Master
+--              Create Indexes, see addin_SvcLogTableStructures for specifications.
+-- ==========================================================================================
+CREATE or ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_4.tblIndex]
+    @TableName NVARCHAR(200),
+    @PartitionSchemeName NVARCHAR(100),
+    @PartitionColumn NVARCHAR(255),
+    @PrimaryKeyDefinition NVARCHAR(MAX),
+    @NonClusteredIndexDefinition NVARCHAR(MAX),
+    @Run_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @RowCount INT = 0;
+    DECLARE @SQL NVARCHAR(MAX);
+
+    IF NOT EXISTS
+    (
+        SELECT a.name
+        FROM sys.tables a
+            left join sys.indexes b
+                on a.object_id = b.object_id
+        where a.name = @TableName
+              and b.type = 1
+    )
+    BEGIN
+        SET @SQL
+            = REPLACE(
+                         REPLACE(
+                                    REPLACE(@PrimaryKeyDefinition, '{0}', QUOTENAME(@TableName)),
+                                    '{1}',
+                                    @PartitionSchemeName
+                                ),
+                         '{2}',
+                         @PartitionColumn
+                     );
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @RowsAffected = @ReturnCode,
+                                          @Action = 'CREATE: Clustered Index CREATED',
+                                          @ErrorCode = NULL,
+                                          @ErrorMessage = NULL;
+            PRINT 'Index Maint - Clustered Index created on table ' + QUOTENAME(@TableName) + '.';
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: Clustered Index Error',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+            PRINT 'Index Maint - Clustered Index: Error occurred:  ' + @ErrorMessage;
+        END CATCH;
+    END
+    ELSE
+    BEGIN
+        PRINT 'Index Maint - Clustered Index for ' + QUOTENAME(@TableName) + ', already exists.';
+    END
+
+    IF NOT EXISTS
+    (
+        SELECT a.name
+        FROM sys.tables a
+            left join sys.indexes b
+                on a.object_id = b.object_id
+        where a.name = @TableName
+              and b.type = 2
+    )
+    BEGIN
+        SET @SQL
+            = REPLACE(
+                         REPLACE(REPLACE(@NonClusteredIndexDefinition, '{0}', @TableName), '{1}', @PartitionSchemeName),
+                         '{2}',
+                         @PartitionColumn
+                     );
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @RowsAffected = @ReturnCode,
+                                          @Action = 'CREATE: NonClustered Index CREATED',
+                                          @ErrorCode = NULL,
+                                          @ErrorMessage = NULL;
+            PRINT 'Index Maint - NonClustered Index created on table ' + QUOTENAME(@TableName) + '.';
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: Clustered Index Error',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+            PRINT 'Index Maint - NonClustered Index: Error occurred:  ' + @ErrorMessage;
+        END CATCH;
+
+    END
+    ELSE
+    BEGIN
+        PRINT 'Index Maint - NonClustered index for ' + QUOTENAME(@TableName) + ', already exists.';
+    END;
+END;
+GO

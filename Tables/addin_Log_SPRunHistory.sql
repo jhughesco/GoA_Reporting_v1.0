@@ -1,0 +1,14 @@
+﻿USE [GADATA_RPT]
+GO
+
+CREATE TABLE [dbo].[addin_Log_SPRunHistory](
+	[ActionID] [int] IDENTITY(999999,1) NOT NULL,
+	[Run_id] [bigint] NULL,
+	[TableAffected] [varchar](255) NULL,
+	[RowsAffected] [int] NULL,
+	[Action] [varchar](max) NULL,
+	[ActionDT] [datetime] NULL,
+	[ErrorCode] [int] NULL,
+	[ErrorMessage] [nvarchar](max) NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO

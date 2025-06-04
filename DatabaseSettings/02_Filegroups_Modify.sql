@@ -1,0 +1,18 @@
+USE [GADATA_RPT]
+GO
+
+-- Remove conflicting FILESTREAM access change
+ALTER DATABASE [GADATA_RPT] 
+SET ANSI_NULLS ON, 
+    ANSI_PADDING ON, 
+    ANSI_WARNINGS ON, 
+    QUOTED_IDENTIFIER ON, 
+    CONCAT_NULL_YIELDS_NULL ON; -- Standard best practices
+
+-- Keep FILESTREAM access enabled
+ALTER DATABASE [GADATA_RPT] 
+SET FILESTREAM(NON_TRANSACTED_ACCESS = FULL);
+
+-- Adjust recovery model for FILESTREAM
+ALTER DATABASE [GADATA_RPT] 
+SET RECOVERY BULK_LOGGED; -- Better for bulk operations

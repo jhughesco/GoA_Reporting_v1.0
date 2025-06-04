@@ -1,0 +1,116 @@
+-- ==========================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Called by sp_SvcLog_1.Create_1.Master
+--              Create Triggers, see addin_SvcLogTableStructures for specifications.
+-- ==========================================================================================
+CREATE or ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_5.Trigger]
+    @TableName NVARCHAR(200),
+    @PartitionSchemeName NVARCHAR(100),
+    @PartitionColumn NVARCHAR(255),
+    @PartitionType INT,
+    @InsertHistoryTriggerDefinition NVARCHAR(MAX),
+    @DeleteHistoryTriggerDefinition NVARCHAR(MAX),
+    @Run_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @SQL NVARCHAR(MAX);
+
+    IF EXISTS (SELECT * FROM sys.tables WHERE name = @TableName)
+    BEGIN
+        DECLARE @InsertHistoryTriggerName NVARCHAR(200) = 'trg_' + @TableName + '_InsertHistory';
+
+        SET @SQL
+            = REPLACE(
+                         REPLACE(
+                                    REPLACE(
+                                               REPLACE(
+                                                          @InsertHistoryTriggerDefinition,
+                                                          '{0}',
+                                                          QUOTENAME(@InsertHistoryTriggerName)
+                                                      ),
+                                               '{1}',
+                                               QUOTENAME(@TableName)
+                                           ),
+                                    '{2}',
+                                    @TableName
+                                ),
+                         '{3}',
+                         QUOTENAME(@InsertHistoryTriggerName)
+                     );
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            IF @ReturnCode = 0
+            BEGIN
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @TableName,
+                                              @RowsAffected = @ReturnCode,
+                                              @Action = 'CREATE: INSERT Trigger ALTER/CREATE',
+                                              @ErrorCode = NULL,
+                                              @ErrorMessage = NULL;
+                PRINT 'Trigger Maint - Trigger ' + @InsertHistoryTriggerName + ' created on table ' + @TableName;
+            END;
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+            PRINT 'Trigger Maint - Error occurred while creating trigger ' + @InsertHistoryTriggerName + ': '
+                  + @ErrorMessage;
+        END CATCH
+
+        DECLARE @DeleteHistoryTriggerName NVARCHAR(200) = 'trg_' + @TableName + '_DeleteHistory';
+
+        SET @SQL
+            = REPLACE(
+                         REPLACE(
+                                    REPLACE(
+                                               REPLACE(
+                                                          @DeleteHistoryTriggerDefinition,
+                                                          '{0}',
+                                                          QUOTENAME(@DeleteHistoryTriggerName)
+                                                      ),
+                                               '{1}',
+                                               QUOTENAME(@TableName)
+                                           ),
+                                    '{2}',
+                                    @TableName
+                                ),
+                         '{3}',
+                         QUOTENAME(@DeleteHistoryTriggerName)
+                     );
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            IF @ReturnCode = 0
+            BEGIN
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @TableName,
+                                              @RowsAffected = @ReturnCode,
+                                              @Action = 'CREATE: DELETE Trigger ALTER/CREATE',
+                                              @ErrorCode = NULL,
+                                              @ErrorMessage = NULL;
+                PRINT 'Trigger Maint - Trigger ' + @InsertHistoryTriggerName + ' created on table ' + @TableName;
+            END;
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+            PRINT 'Trigger Maint - Error occurred while creating trigger ' + @DeleteHistoryTriggerName + ': '
+                  + @ErrorMessage;
+        END CATCH
+    END
+    ELSE
+    BEGIN
+        PRINT 'Trigger Maint - Table ' + @TableName + ' does not exists.';
+    END;
+END;
+GO

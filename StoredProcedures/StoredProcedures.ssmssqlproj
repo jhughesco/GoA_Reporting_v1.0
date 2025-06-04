@@ -1,0 +1,202 @@
+<?xml version="1.0"?>
+<SqlWorkbenchSqlProject xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Name="StoredProcedures">
+  <Items>
+    <LogicalFolder Name="Connections" Type="2" Sorted="true">
+      <Items>
+        <ConnectionNode Name="JL1LESWGOAWDB01.ilab.local\SQL01,28001:ess_transmissions">
+          <Created>2025-03-28T13:01:32.1064712-04:00</Created>
+          <Type>SQL</Type>
+          <Server>JL1LESWGOAWDB01.ilab.local\SQL01,28001</Server>
+          <UserName>ess_transmissions</UserName>
+          <Authentication>SQL</Authentication>
+          <InitialDB>GADATA_RPT_DEV1</InitialDB>
+          <LoginTimeout>30</LoginTimeout>
+          <ExecutionTimeout>0</ExecutionTimeout>
+          <ConnectionProtocol>NotSpecified</ConnectionProtocol>
+          <ApplicationName />
+        </ConnectionNode>
+      </Items>
+    </LogicalFolder>
+    <LogicalFolder Name="Queries" Type="0" Sorted="true">
+      <Items>
+        <FileNode Name="depr_sp_ft_1.Maint_4.Snapshot_v1.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>depr_sp_ft_1.Maint_4.Snapshot_v1.sql</FullPath>
+        </FileNode>
+        <FileNode Name="depr_sp_ft_2.Load_2.Snapshot_Incremental.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>depr_sp_ft_2.Load_2.Snapshot_Incremental.sql</FullPath>
+        </FileNode>
+        <FileNode Name="depr_sp_JobLogs_1.FT_1.MetaData.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>depr_sp_JobLogs_1.FT_1.MetaData.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_devft_2.1.Retention.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>sp_devft_2.1.Retention.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_fnLogSPRunHistory.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_fnLogSPRunHistory.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_ft_1.EODMaint_1.FileRetention.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_ft_1.EODMaint_1.FileRetention.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_ft_1.EODMaint_2.GC.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_ft_1.EODMaint_2.GC.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_ft_1.EODMaint_3.PopulateIndex.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_ft_1.EODMaint_3.PopulateIndex.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_ft_1.EODMaint_4.idxPartition.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_ft_1.EODMaint_4.idxPartition.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_ft_2.Load_1.Metadata_Update.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_ft_2.Load_1.Metadata_Update.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_ft_2.Load_9.Metadata_FullUpdate.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_ft_2.Load_9.Metadata_FullUpdate.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_PopulateDateDimension.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_PopulateDateDimension.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_0.MetaData.Master.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_0.MetaData.Master.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_1.Create_1.Master.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_1.Create_1.Master.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_1.Create_2.idxPartition.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_1.Create_2.idxPartition.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_1.Create_3.Table.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_1.Create_3.Table.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_1.Create_4.tblIndex.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_1.Create_4.tblIndex.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_1.Create_5.Trigger.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_1.Create_5.Trigger.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_1.Create_6.View.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_1.Create_6.View.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_1.Create_7.DropExpired.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_1.Create_7.DropExpired.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_2.Load_1.Master.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_2.Load_1.Master.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_2.Load_2.Insert.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_2.Load_2.Insert.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_3.Purge_1.Master.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_3.Purge_1.Master.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_3.Purge_2.Move.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_3.Purge_2.Move.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_3.Purge_3.Delete.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_3.Purge_3.Delete.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_4.Tune_1.MetaData.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_4.Tune_1.MetaData.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_4.Tune_0.Master.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_4.Tune_0.Master.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_4.Tune_2.ReOrg.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_4.Tune_2.ReOrg.sql</FullPath>
+        </FileNode>
+        <FileNode Name="sp_SvcLog_4.Tune_3.ReBuild.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:JL1LESWGOAWDB01.ilab.local\SQL01,28001:False:ess_transmissions</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>JL1LESWGOAWDB01.ilab.local\SQL01,28001</AssociatedConnSrvName>
+          <AssociatedConnUserName>ess_transmissions</AssociatedConnUserName>
+          <FullPath>sp_SvcLog_4.Tune_3.ReBuild.sql</FullPath>
+        </FileNode>
+      </Items>
+    </LogicalFolder>
+    <LogicalFolder Name="Miscellaneous" Type="3" Sorted="true">
+      <Items />
+    </LogicalFolder>
+  </Items>
+</SqlWorkbenchSqlProject>

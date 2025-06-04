@@ -1,0 +1,990 @@
+-- =============================================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Creates a series of tables, see addin_SvcLogTableStructures for specifications.
+--              Specs, service table size breakout (approx), to maintain logs x 16mo:
+--                < 2.5 mil/rec/mo. = Single Table.  rpt(replaces dpa)_[OrigTableName] 
+--                > 2.5 mil/rec/mo. < 6.5 = 16 tables. rpt(replaces dpa)_[OrigTableName]_[yyyy]_[mm]
+--                > 6.5 mil/rec/mo. = 25 tables. rpt(replaces dpa)_[OrigTableName]_[yyyy]_[mm]_[WeekOfYear]
+--                ** multi table sets may have 1-2 tables more than above, depending on timing.
+--
+--				Also: Creates Table Index Partitions, Indexes, Trigers, and view for each table
+-- =============================================================================================================
+
+CREATE or ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_1.Master] @Run_id INT = 0 OUTPUT --Accepts input, defaults to 0 if not provided
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @CurrentDate DATE = GETDATE();
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @SQL NVARCHAR(MAX);
+    DECLARE @SourceServer NVARCHAR(255);
+    DECLARE @SourceDatabase NVARCHAR(255);
+    DECLARE @SourceTableName NVARCHAR(255);
+    DECLARE @PartitionColumn NVARCHAR(255);
+    DECLARE @MinValue DATETIME;
+    DECLARE @StartTime DATETIME = FORMAT(GETDATE(), 'yyyy-MM-dd HH:mm:ss');
+    DECLARE @LoadTime INT;
+    DECLARE @ViewName NVARCHAR(255);
+    DECLARE @ViewSQL NVARCHAR(MAX);
+    DECLARE @TableNamePrefix NVARCHAR(255);
+    DECLARE @SourceStartDT DATETIME;
+    DECLARE @TableDistroLvl INT;
+    DECLARE @TableList NVARCHAR(MAX) = '';
+    DECLARE @TotalRowCount INT = 0;
+    DECLARE @ReturnCode INT = 0;
+    IF @Run_id = 0
+    BEGIN
+        SELECT @Run_id = ABS(CHECKSUM(NewId())) % 999999999;
+    END
+    DECLARE @TableName NVARCHAR(200);
+    DECLARE @PartitionFunctionName NVARCHAR(100);
+    DECLARE @PartitionSchemeName NVARCHAR(100);
+    DECLARE @SourceEndDT DATE;
+    DECLARE @PartitionType INT;
+    DECLARE @ViewDefinition NVARCHAR(MAX);
+    DECLARE @TableDefinition NVARCHAR(MAX);
+    DECLARE @PrimaryKeyDefinition NVARCHAR(MAX);
+    DECLARE @NonClusteredIndexDefinition NVARCHAR(MAX);
+    DECLARE @InsertHistoryTriggerDefinition NVARCHAR(MAX);
+    DECLARE @DeleteHistoryTriggerDefinition NVARCHAR(MAX);
+    BEGIN TRY
+        PRINT '----------------------------- Table Creation/Maintenance -----------------------------'
+        DECLARE create_cursor CURSOR FOR
+        SELECT TableNamePrefix,
+               TableName,
+               PartitionFunctionName,
+               PartitionSchemeName,
+               MAX(SourceStartDT),
+               MAX(SourceEndDT),
+               CASE
+                   WHEN TableDistroLvl = 2
+                        and PartitionFunctionName LIKE '%Daily' THEN
+                       2
+                   WHEN TableDistroLvl = 2
+                        and PartitionFunctionName LIKE '%Weekly' THEN
+                       1
+               END PartitionType
+        FROM temp_SvcLog_1_Create ct
+        GROUP BY TableNamePrefix,
+                 TableName,
+                 PartitionFunctionName,
+                 PartitionSchemeName,
+                 CASE
+                     WHEN TableDistroLvl = 2
+                          and PartitionFunctionName LIKE '%Daily' THEN
+                         2
+                     WHEN TableDistroLvl = 2
+                          and PartitionFunctionName LIKE '%Weekly' THEN
+                         1
+                 END;
+        OPEN create_cursor;
+        FETCH NEXT FROM create_cursor
+        INTO @TableNamePrefix,
+             @TableName,
+             @PartitionFunctionName,
+             @PartitionSchemeName,
+             @SourceStartDT,
+             @SourceEndDT,
+             @PartitionType;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            -- Go!
+            -- Create/Alter/Extend index Partitions.
+            BEGIN TRY
+                EXEC [dbo].[sp_SvcLog_1.Create_2.idxPartition] @PartitionFunctionName = @PartitionFunctionName,
+                                                               @PartitionSchemeName = @PartitionSchemeName,
+                                                               @AddDate = @SourceStartDT,
+                                                               @PartitionType = @PartitionType,
+                                                               @Run_id = @Run_id,
+                                                               @TableName = @TableName;
+            END TRY
+            BEGIN CATCH
+                SELECT @ErrorMessage = ERROR_MESSAGE(),
+                       @ErrorSeverity = ERROR_SEVERITY(),
+                       @ErrorState = ERROR_STATE();
+                PRINT 'Error occurred while extending Partition Function:';
+                PRINT 'Error ' + CAST(@ErrorSeverity AS NVARCHAR(10)) + ', State ' + CAST(@ErrorState AS NVARCHAR(10))
+                      + ': ' + @ErrorMessage;
+            END CATCH;
+            SELECT @TableDefinition = TableDefinition,
+                   @PrimaryKeyDefinition = PrimaryKeyDefinition,
+                   @NonClusteredIndexDefinition = NonClusteredIndexDefinition,
+                   @PartitionColumn = PartitionColumn,
+                   @InsertHistoryTriggerDefinition = InsertHistoryTriggerDefinition,
+                   @DeleteHistoryTriggerDefinition = DeleteHistoryTriggerDefinition,
+                   @TableDistroLvl = TableDistroLvl
+            FROM addin_SvcLogTableStructures
+            WHERE TableNamePrefix = @TableNamePrefix;
+            BEGIN TRY
+                EXEC [dbo].[sp_SvcLog_1.Create_3.Table] @TableName = @TableName,
+                                                        @PartitionSchemeName = @PartitionSchemeName,
+                                                        @PartitionColumn = @PartitionColumn,
+                                                        @SourceEndDT = @SourceEndDT,
+                                                        @PartitionType = @PartitionType,
+                                                        @TableDefinition = @TableDefinition,
+                                                        @Run_id = @Run_id;
+            END TRY
+            BEGIN CATCH
+                SELECT @ErrorMessage = ERROR_MESSAGE(),
+                       @ErrorSeverity = ERROR_SEVERITY(),
+                       @ErrorState = ERROR_STATE();
+                PRINT 'Error occurred while creating Table:';
+                PRINT 'Error ' + CAST(@ErrorSeverity AS NVARCHAR(10)) + ', State ' + CAST(@ErrorState AS NVARCHAR(10))
+                      + ': ' + @ErrorMessage;
+                CONTINUE;
+            END CATCH;
+            BEGIN TRY
+                IF @TableName != 'rpt_trigger_log_detail'
+                BEGIN
+                    EXEC [dbo].[sp_SvcLog_1.Create_4.tblIndex] @TableName = @TableName,
+                                                               @PartitionSchemeName = @PartitionSchemeName,
+                                                               @PartitionColumn = @PartitionColumn,
+                                                               @PrimaryKeyDefinition = @PrimaryKeyDefinition,
+                                                               @NonClusteredIndexDefinition = @NonClusteredIndexDefinition,
+                                                               @Run_id = @Run_id;
+                END;
+            END TRY
+            BEGIN CATCH
+                SELECT @ErrorMessage = ERROR_MESSAGE(),
+                       @ErrorSeverity = ERROR_SEVERITY(),
+                       @ErrorState = ERROR_STATE();
+                PRINT 'Error occurred while creating an table Index:';
+                PRINT 'Error ' + CAST(@ErrorSeverity AS NVARCHAR(10)) + ', State ' + CAST(@ErrorState AS NVARCHAR(10))
+                      + ': ' + @ErrorMessage;
+            END CATCH;
+            BEGIN TRY
+                EXEC [dbo].[sp_SvcLog_1.Create_5.Trigger] @TableName = @TableName,
+                                                          @PartitionSchemeName = @PartitionSchemeName,
+                                                          @PartitionColumn = @PartitionColumn,
+                                                          @PartitionType = @PartitionType,
+                                                          @InsertHistoryTriggerDefinition = @InsertHistoryTriggerDefinition,
+                                                          @DeleteHistoryTriggerDefinition = @DeleteHistoryTriggerDefinition,
+                                                          @Run_id = @Run_id;
+            END TRY
+            BEGIN CATCH
+                SELECT @ErrorMessage = ERROR_MESSAGE(),
+                       @ErrorSeverity = ERROR_SEVERITY(),
+                       @ErrorState = ERROR_STATE();
+                PRINT 'Error occurred while creating table Trigger:';
+                PRINT 'Error ' + CAST(@ErrorSeverity AS NVARCHAR(10)) + ', State ' + CAST(@ErrorState AS NVARCHAR(10))
+                      + ': ' + @ErrorMessage;
+                CONTINUE;
+            END CATCH;
+            PRINT '----------------------- ' + QUOTENAME(@TableName)
+                  + ' Table and Assets created/altered -----------------------'
+            FETCH NEXT FROM create_cursor
+            INTO @TableNamePrefix,
+                 @TableName,
+                 @PartitionFunctionName,
+                 @PartitionSchemeName,
+                 @SourceStartDT,
+                 @SourceEndDT,
+                 @PartitionType;
+            PRINT '----------------------------- End Table Creation/Maintenance -----------------------------'
+        END
+        CLOSE create_cursor;
+        DEALLOCATE create_cursor;
+    END TRY
+    BEGIN CATCH
+        CLOSE create_cursor;
+        DEALLOCATE create_cursor;
+        PRINT 'Nope Tables'
+    END CATCH
+    BEGIN TRY
+        PRINT '----------------------- Begin View Creation/Maintenance -----------------------'
+        DECLARE view_cursor CURSOR FOR
+        SELECT TableNamePrefix,
+               TableName,
+               ViewDefinition,
+               TableDistroLvl
+        FROM
+        (
+            SELECT a.TableNamePrefix,
+                   a.TableName,
+                   b.ViewDefinition,
+                   a.TableDistroLvl
+            FROM temp_SvcLog_1_Create a
+                JOIN addin_SvcLogTableStructures b
+                    on a.TableNamePrefix = b.TableNamePrefix
+            GROUP BY a.TableNamePrefix,
+                     a.TableName,
+                     b.ViewDefinition,
+                     a.TableDistroLvl
+        ) x;
+        OPEN view_cursor;
+        FETCH NEXT FROM view_cursor
+        INTO @TableNamePrefix,
+             @TableName,
+             @ViewDefinition,
+             @TableDistroLvl;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                IF @TableDistroLvl = 0
+                BEGIN
+                    EXEC [dbo].[sp_SvcLog_1.Create_6.View] @TableName = @TableName,
+                                                           @TableNamePrefix = @TableNamePrefix,
+                                                           @ViewDefinition = @ViewDefinition,
+                                                           @TableDistroLvl = @TableDistroLvl,
+                                                           @Run_id = @Run_id;
+                END
+                ELSE
+                BEGIN
+                    SELECT @TableList
+                        = STRING_AGG(
+                                        'SELECT *, ''' + TableName + ''' as vwName FROM ' + QUOTENAME(TableName),
+                                        ' UNION ALL '
+                                    ) --Roll em' up! (UNION ALL for the tech minded)
+                    FROM temp_SvcLog_1_Create
+                    WHERE TableNamePrefix = @TableNamePrefix;
+                    EXEC [dbo].[sp_SvcLog_1.Create_6.View] @TableName = @TableName,
+                                                           @TableNamePrefix = @TableNamePrefix,
+                                                           @TableList = @TableList,
+                                                           @ViewDefinition = @ViewDefinition,
+                                                           @TableDistroLvl = @TableDistroLvl,
+                                                           @Run_id = @Run_id;
+                END;
+            END TRY
+            BEGIN CATCH
+                SELECT @ErrorMessage = ERROR_MESSAGE(),
+                       @ErrorSeverity = ERROR_SEVERITY(),
+                       @ErrorState = ERROR_STATE();
+                PRINT 'Error occurred while creating View:';
+                PRINT 'Error ' + CAST(@ErrorSeverity AS NVARCHAR(10)) + ', State ' + CAST(@ErrorState AS NVARCHAR(10))
+                      + ': ' + @ErrorMessage;
+            END CATCH;
+            FETCH NEXT FROM view_cursor
+            INTO @TableNamePrefix,
+                 @TableName,
+                 @ViewDefinition,
+                 @TableDistroLvl;
+        END
+        CLOSE view_cursor;
+        DEALLOCATE view_cursor;
+        PRINT '----------------------- END View Creation/Maintenance -----------------------'
+    END TRY
+    BEGIN CATCH
+        CLOSE view_cursor;
+        DEALLOCATE view_cursor;
+    END CATCH
+    BEGIN TRY
+        EXEC [dbo].[sp_SvcLog_1.Create_7.DropExpired] @Run_id = @Run_id;
+    END TRY
+    BEGIN CATCH
+        SELECT @ErrorMessage = ERROR_MESSAGE(),
+               @ErrorSeverity = ERROR_SEVERITY(),
+               @ErrorState = ERROR_STATE();
+        PRINT 'Error occurred while creating View:';
+        PRINT 'Error ' + CAST(@ErrorSeverity AS NVARCHAR(10)) + ', State ' + CAST(@ErrorState AS NVARCHAR(10)) + ': '
+              + @ErrorMessage;
+    END CATCH;
+    BEGIN TRY
+        PRINT '----------------------------- ~fin~ maintenance! -----------------------------'
+        SET @LoadTime = DATEDIFF(millisecond, @StartTime, GETDATE())
+        DECLARE @hr varchar(2);
+        DECLARE @min varchar(2);
+        DECLARE @sec varchar(2);
+        DECLARE @ms varchar(10);
+        select @hr = @LoadTime / 3600000,
+               @min = (@LoadTime - ((@LoadTime / 3600000) * 3600000)) / 60000,
+               @sec = (@LoadTime - (((@LoadTime) / 60000) * 60000)) / 1000,
+               @ms = @LoadTime - (((@LoadTime) / 1000) * 1000)
+        PRINT CHAR(13) + 'Start Time: ' + CAST(FORMAT(@StartTime, 'yyyy-MM-dd HH:mm:ss') as NVARCHAR(20));
+        PRINT '-------------------------------------------------------------------'
+        PRINT 'Table Creation Runtime: ' + CAST(@LoadTime as NVARCHAR(10)) + ' milliseconds';
+        PRINT 'Runtime Breakdown: ' + CHAR(13) + 'Minutes: ' + CAST(@min as NVARCHAR(2)) + CHAR(13) + 'Seconds: '
+              + CAST(@sec as NVARCHAR(2)) + CHAR(13) + 'Milliseconds: ' + CAST(@ms as NVARCHAR(2));
+        PRINT '-------------------------------------------------------------------'
+        PRINT 'End Time: ' + CAST(FORMAT(GetDate(), 'yyyy-MM-dd HH:mm:ss') as NVARCHAR(20));
+    END TRY
+    BEGIN CATCH
+        SELECT @ErrorMessage = ERROR_MESSAGE(),
+               @ErrorSeverity = ERROR_SEVERITY(),
+               @ErrorState = ERROR_STATE();
+        PRINT 'Error occurred during processing:';
+        PRINT 'Error ' + CAST(@ErrorSeverity AS NVARCHAR(10)) + ', State ' + CAST(@ErrorState AS NVARCHAR(10)) + ': '
+              + @ErrorMessage;
+    END CATCH;
+    RETURN @Run_id
+END;
+GO
+
+-- =============================================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Called by sp_SvcLog_1.Create_1.Master
+--				Creates/Alters Table Index Partitions
+-- =============================================================================================================
+CREATE OR ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_2.idxPartition]
+    @PartitionFunctionName NVARCHAR(128),
+    @PartitionSchemeName NVARCHAR(128),
+    @AddDate DATE = NULL,
+    @PartitionType INT,
+    @Run_id INT,
+    @TableName NVARCHAR(200)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @SQL NVARCHAR(MAX) = '';
+    DECLARE @CurrentMaxBoundary DATETIME;
+    DECLARE @CurrentMinBoundary DATETIME;
+    DECLARE @Interval INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @ErrorMessage NVARCHAR(MAX);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+
+    PRINT '------- Processing Started for ' + QUOTENAME(@TableName) + ': ' + CAST(GETDATE() as VARCHAR(20))
+          + ' -------';
+    PRINT 'idx Part Maint - Run: sp_SvcLog_Maint_2_CREATE_IndexPartitions with parameters:';
+    PRINT 'idx Part Maint - PartitionFunctionName/PartitionSchemeName: ' + @PartitionFunctionName;
+    PRINT 'idx Part Maint - Extend, AddDate: ' + ISNULL(CONVERT(VARCHAR, @AddDate, 120), 'NULL');
+
+    SET @Interval = CASE
+                        WHEN @PartitionType = 2 THEN 1
+                        ELSE 7
+                    END;
+
+    IF NOT EXISTS
+    (
+        SELECT *
+        FROM sys.partition_functions
+        WHERE name = @PartitionFunctionName
+    )
+    BEGIN
+        SET @SQL
+            = 'CREATE PARTITION FUNCTION ' + QUOTENAME(@PartitionFunctionName)
+              + '(DATETIME) AS RANGE RIGHT FOR VALUES (';
+
+        DECLARE @StartDate DATETIME = ISNULL(@AddDate, CAST(CAST(YEAR(GETDATE()) AS CHAR(4)) + '-01-01' AS DATETIME));
+        DECLARE @EndDate DATE;
+        SET @EndDate = CASE
+                           WHEN @PartitionType = 0
+                                or @PartitionType = 1 THEN DATEADD(DAY, 7, @StartDate)
+                           ELSE EOMONTH(@StartDate)
+                       END;
+
+        WHILE @StartDate < @EndDate
+        BEGIN
+            SET @SQL += '''' + CONVERT(VARCHAR, @StartDate, 120) + ''', ';
+            SET @StartDate = DATEADD(DAY, @Interval, @StartDate);
+        END
+
+        SET @SQL = LEFT(@SQL, LEN(@SQL) - 2) + ''')';
+
+        SET @SQL += '; CREATE PARTITION SCHEME ' + QUOTENAME(@PartitionSchemeName) + ' AS PARTITION '
+                    + QUOTENAME(@PartitionFunctionName) + ' ALL TO ([PRIMARY])';
+
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: idxPart/Scheme CREATE/ALTER',
+                                          @ErrorCode = NULL,
+                                          @ErrorMessage = NULL;
+            PRINT 'idx Part Maint - Partition function and scheme created successfully.';
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: idxPart/Scheme CREATE/ALTER',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+            PRINT 'idx Part Maint - Error creating partition function and scheme: '
+                  + CAST(@ErrorSeverity AS NVARCHAR(10));
+            PRINT 'idx Part Maint - Error creating partition function and scheme: ' + CAST(@ErrorState AS NVARCHAR(10))
+                  + ': ' + @ErrorMessage;
+        END CATCH;
+    END
+    ELSE
+    BEGIN
+        PRINT 'idx Part Maint - Partition function already exists.';
+    END
+
+    SELECT @CurrentMaxBoundary = CONVERT(DATETIME, MAX(r.value)),
+           @CurrentMinBoundary = CONVERT(DATETIME, MIN(r.value))
+    FROM sys.partition_functions f
+        JOIN sys.partition_range_values r
+            ON f.function_id = r.function_id
+    WHERE f.name = @PartitionFunctionName;
+
+    PRINT 'idx Part Maint - Current max boundary: ' + CONVERT(VARCHAR, @CurrentMaxBoundary, 120);
+    PRINT 'idx Part Maint - Current min boundary: ' + CONVERT(VARCHAR, @CurrentMinBoundary, 120);
+
+    IF @AddDate IS NOT NULL
+       AND @AddDate > @CurrentMaxBoundary
+    BEGIN
+        PRINT 'idx Part Maint - Adding new partition boundaries.';
+
+        SET @CurrentMinBoundary = DATEADD(DAY, @Interval, @CurrentMaxBoundary); -- Start from next day after current max boundary
+
+        WHILE @CurrentMinBoundary < @AddDate
+        BEGIN
+            IF NOT EXISTS
+            (
+                SELECT 1
+                FROM sys.partition_range_values
+                WHERE function_id IN (
+                                         SELECT function_id
+                                         FROM sys.partition_functions
+                                         WHERE name = @PartitionFunctionName
+                                     )
+                      AND value = CONVERT(DATETIME, @CurrentMinBoundary)
+            )
+            BEGIN
+                SET @SQL += '
+					ALTER PARTITION SCHEME ' + QUOTENAME(@PartitionSchemeName)
+                            + ' NEXT USED [PRIMARY];
+					ALTER PARTITION FUNCTION ' + QUOTENAME(@PartitionFunctionName) + '() SPLIT RANGE ('''
+                            + CONVERT(VARCHAR, @CurrentMinBoundary, 120) + ''');';
+
+                PRINT 'idx Part Maint - New partition added for boundary: '
+                      + CONVERT(VARCHAR, @CurrentMinBoundary, 120);
+            END
+
+            SET @CurrentMinBoundary = DATEADD(DAY, @Interval, @CurrentMinBoundary);
+        END
+
+        BEGIN TRY
+            IF LEN(@SQL) > 0
+            BEGIN
+                EXEC @ReturnCode = sp_executesql @SQL;
+
+                IF @ReturnCode = 0
+                BEGIN
+                    EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                                  @TableAffected = @TableName,
+                                                  @Action = 'CREATE: idxPart/Scheme CREATE/ALTER',
+                                                  @ErrorCode = NULL,
+                                                  @ErrorMessage = NULL;
+                    PRINT 'idx Part Maint - New partitions added successfully.';
+                END;
+            END
+            ELSE
+                SELECT @ErrorMessage = ERROR_MESSAGE(),
+                       @ErrorSeverity = ERROR_SEVERITY();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: idxPart/Scheme CREATE/ALTER',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+            PRINT 'idx Part Maint - New Boundary NOT ADDED!';
+        END TRY
+        BEGIN CATCH
+            PRINT 'idx Part Maint - Error updating partition function: ' + @ErrorMessage;
+        END CATCH;
+    END
+    ELSE IF @AddDate IS NOT NULL
+            AND @AddDate <= @CurrentMaxBoundary
+    BEGIN
+        PRINT 'idx Part Maint - No new Boundary added, older than or equal to CurrentMaxBoundary.';
+    END
+
+END;
+GO
+
+-- =============================================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Creates a series of tables, see addin_SvcLogTableStructures for specifications.
+--              Specs, service table size breakout (approx), to maintain logs x 16mo:
+--                < 2.5 mil/rec/mo. = Single Table.  rpt(replaces dpa)_[OrigTableName] 
+--                > 2.5 mil/rec/mo. < 6.5 = 16 tables. rpt(replaces dpa)_[OrigTableName]_[yyyy]_[mm]
+--                > 6.5 mil/rec/mo. = 25 tables. rpt(replaces dpa)_[OrigTableName]_[yyyy]_[mm]_[WeekOfYear]
+--                ** multi table sets may have 1-2 tables more than above, depending on timing.
+-- =============================================================================================================
+CREATE PROCEDURE [dbo].[sp_SvcLog_1.Create_3.Table]
+    @TableName NVARCHAR(200),
+    @PartitionSchemeName NVARCHAR(100),
+    @PartitionColumn NVARCHAR(255),
+    @SourceEndDT DATE,
+    @PartitionType INT,
+    @TableDefinition NVARCHAR(MAX),
+    @Run_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @RowCount INT;
+    DECLARE @SQL NVARCHAR(MAX);
+
+    IF EXISTS (SELECT name FROM sys.tables WHERE name = @TableName)
+    BEGIN
+        PRINT 'Table Maint - Table ' + QUOTENAME(@TableName) + ' already exists.';
+    END
+    ELSE
+    BEGIN
+        PRINT QUOTENAME(@TableName) + ' DOES NOT EXIST, let''s create it!';
+        SET @SQL
+            = REPLACE(
+                         REPLACE(REPLACE(@TableDefinition, '{0}', QUOTENAME(@TableName)), '{1}', @PartitionSchemeName),
+                         '{2}',
+                         @PartitionColumn
+                     );
+
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @RowsAffected = @ReturnCode,
+                                          @Action = 'CREATE: CREATE TABLE',
+                                          @ErrorCode = NULL,
+                                          @ErrorMessage = NULL;
+
+            PRINT 'Table Create - ' + QUOTENAME(@TableName) + ' created successfully.';
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @RowsAffected = NULL,
+                                          @Action = 'CREATE: CREATE TABLE',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+
+            PRINT 'Table Create Error - Severity: ' + CAST(ERROR_SEVERITY() AS NVARCHAR(10));
+            PRINT 'Table Create Error - Severity: State ' + CAST(ERROR_STATE() AS NVARCHAR(10)) + ': '
+                  + ERROR_MESSAGE();
+        END CATCH;
+    END;
+END;
+GO
+
+-- ==========================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Called by sp_SvcLog_1.Create_1.Master
+--              Create Indexes, see addin_SvcLogTableStructures for specifications.
+-- ==========================================================================================
+CREATE or ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_4.tblIndex]
+    @TableName NVARCHAR(200),
+    @PartitionSchemeName NVARCHAR(100),
+    @PartitionColumn NVARCHAR(255),
+    @PrimaryKeyDefinition NVARCHAR(MAX),
+    @NonClusteredIndexDefinition NVARCHAR(MAX),
+    @Run_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @RowCount INT = 0;
+    DECLARE @SQL NVARCHAR(MAX);
+
+    IF NOT EXISTS
+    (
+        SELECT a.name
+        FROM sys.tables a
+            left join sys.indexes b
+                on a.object_id = b.object_id
+        where a.name = @TableName
+              and b.type = 1
+    )
+    BEGIN
+        SET @SQL
+            = REPLACE(
+                         REPLACE(
+                                    REPLACE(@PrimaryKeyDefinition, '{0}', QUOTENAME(@TableName)),
+                                    '{1}',
+                                    @PartitionSchemeName
+                                ),
+                         '{2}',
+                         @PartitionColumn
+                     );
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @RowsAffected = @ReturnCode,
+                                          @Action = 'CREATE: Clustered Index CREATED',
+                                          @ErrorCode = NULL,
+                                          @ErrorMessage = NULL;
+            PRINT 'Index Maint - Clustered Index created on table ' + QUOTENAME(@TableName) + '.';
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: Clustered Index Error',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+            PRINT 'Index Maint - Clustered Index: Error occurred:  ' + @ErrorMessage;
+        END CATCH;
+    END
+    ELSE
+    BEGIN
+        PRINT 'Index Maint - Clustered Index for ' + QUOTENAME(@TableName) + ', already exists.';
+    END
+
+    IF NOT EXISTS
+    (
+        SELECT a.name
+        FROM sys.tables a
+            left join sys.indexes b
+                on a.object_id = b.object_id
+        where a.name = @TableName
+              and b.type = 2
+    )
+    BEGIN
+        SET @SQL
+            = REPLACE(
+                         REPLACE(REPLACE(@NonClusteredIndexDefinition, '{0}', @TableName), '{1}', @PartitionSchemeName),
+                         '{2}',
+                         @PartitionColumn
+                     );
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @RowsAffected = @ReturnCode,
+                                          @Action = 'CREATE: NonClustered Index CREATED',
+                                          @ErrorCode = NULL,
+                                          @ErrorMessage = NULL;
+            PRINT 'Index Maint - NonClustered Index created on table ' + QUOTENAME(@TableName) + '.';
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: Clustered Index Error',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+            PRINT 'Index Maint - NonClustered Index: Error occurred:  ' + @ErrorMessage;
+        END CATCH;
+
+    END
+    ELSE
+    BEGIN
+        PRINT 'Index Maint - NonClustered index for ' + QUOTENAME(@TableName) + ', already exists.';
+    END;
+END;
+GO
+
+-- ==========================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Called by sp_SvcLog_1.Create_1.Master
+--              Create Triggers, see addin_SvcLogTableStructures for specifications.
+-- ==========================================================================================
+CREATE or ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_5.Trigger]
+    @TableName NVARCHAR(200),
+    @PartitionSchemeName NVARCHAR(100),
+    @PartitionColumn NVARCHAR(255),
+    @PartitionType INT,
+    @InsertHistoryTriggerDefinition NVARCHAR(MAX),
+    @DeleteHistoryTriggerDefinition NVARCHAR(MAX),
+    @Run_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @SQL NVARCHAR(MAX);
+
+    IF EXISTS (SELECT * FROM sys.tables WHERE name = @TableName)
+    BEGIN
+        DECLARE @InsertHistoryTriggerName NVARCHAR(200) = 'trg_' + @TableName + '_InsertHistory';
+
+        SET @SQL
+            = REPLACE(
+                         REPLACE(
+                                    REPLACE(
+                                               REPLACE(
+                                                          @InsertHistoryTriggerDefinition,
+                                                          '{0}',
+                                                          QUOTENAME(@InsertHistoryTriggerName)
+                                                      ),
+                                               '{1}',
+                                               QUOTENAME(@TableName)
+                                           ),
+                                    '{2}',
+                                    @TableName
+                                ),
+                         '{3}',
+                         QUOTENAME(@InsertHistoryTriggerName)
+                     );
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            IF @ReturnCode = 0
+            BEGIN
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @TableName,
+                                              @RowsAffected = @ReturnCode,
+                                              @Action = 'CREATE: INSERT Trigger ALTER/CREATE',
+                                              @ErrorCode = NULL,
+                                              @ErrorMessage = NULL;
+                PRINT 'Trigger Maint - Trigger ' + @InsertHistoryTriggerName + ' created on table ' + @TableName;
+            END;
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+            PRINT 'Trigger Maint - Error occurred while creating trigger ' + @InsertHistoryTriggerName + ': '
+                  + @ErrorMessage;
+        END CATCH
+
+        DECLARE @DeleteHistoryTriggerName NVARCHAR(200) = 'trg_' + @TableName + '_DeleteHistory';
+
+        SET @SQL
+            = REPLACE(
+                         REPLACE(
+                                    REPLACE(
+                                               REPLACE(
+                                                          @DeleteHistoryTriggerDefinition,
+                                                          '{0}',
+                                                          QUOTENAME(@DeleteHistoryTriggerName)
+                                                      ),
+                                               '{1}',
+                                               QUOTENAME(@TableName)
+                                           ),
+                                    '{2}',
+                                    @TableName
+                                ),
+                         '{3}',
+                         QUOTENAME(@DeleteHistoryTriggerName)
+                     );
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            IF @ReturnCode = 0
+            BEGIN
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @TableName,
+                                              @RowsAffected = @ReturnCode,
+                                              @Action = 'CREATE: DELETE Trigger ALTER/CREATE',
+                                              @ErrorCode = NULL,
+                                              @ErrorMessage = NULL;
+                PRINT 'Trigger Maint - Trigger ' + @InsertHistoryTriggerName + ' created on table ' + @TableName;
+            END;
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+            PRINT 'Trigger Maint - Error occurred while creating trigger ' + @DeleteHistoryTriggerName + ': '
+                  + @ErrorMessage;
+        END CATCH
+    END
+    ELSE
+    BEGIN
+        PRINT 'Trigger Maint - Table ' + @TableName + ' does not exists.';
+    END;
+END;
+GO
+
+-- ==========================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Called by sp_SvcLog_1.Create_1.Master
+--              Create Views, see addin_SvcLogTableStructures for specifications.
+-- ==========================================================================================
+CREATE or ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_6.View]
+    @TableName NVARCHAR(200),
+    @TableNamePrefix NVARCHAR(200),
+    @TableList NVARCHAR(MAX) = NULL,
+    @ViewDefinition NVARCHAR(MAX),
+    @TableDistroLvl INT,
+    @Run_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @SQL NVARCHAR(MAX);
+    DECLARE @ActionMsg NVARCHAR(255);
+    DECLARE @ViewName NVARCHAR(255);
+
+    IF @TableDistroLvl = 0
+    BEGIN
+        SET @SQL = REPLACE(REPLACE(@ViewDefinition, '{0}', @TableNamePrefix), '({1})', @TableNamePrefix);
+        SET @ViewName = QUOTENAME(CONCAT('vw_', @TableNamePrefix))
+        SET @ActionMsg = CONCAT('CREATE: ', QUOTENAME(@TableName),' added to View.');
+
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            IF @ReturnCode = 0
+            BEGIN
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @ViewName,
+                                              @RowsAffected = @ReturnCode,
+                                              @Action = @ActionMsg,
+                                              @ErrorCode = NULL,
+                                              @ErrorMessage = NULL;
+                PRINT 'View Maint - ' + QUOTENAME(CONCAT('vw_', @TableNamePrefix)) + ' ALTERED/CREATED.  Added: '
+                      + QUOTENAME(@TableName) + ' to view successfully.';
+            END;
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+            PRINT @SQL;
+            PRINT 'View Maint -  Error occurred while creating view: ' + @ErrorMessage;
+        END CATCH;
+    END
+    ELSE
+    BEGIN
+        SET @SQL = REPLACE(REPLACE(@ViewDefinition, '{0}', @TableNamePrefix), '{1}', @TableList);
+        SET @ViewName = QUOTENAME(CONCAT('vw_', @TableNamePrefix))
+        SET @ActionMsg = CONCAT('CREATE: ', QUOTENAME(@TableName),' added to ', QUOTENAME(CONCAT('vw_', @TableNamePrefix)));
+
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            IF @ReturnCode = 0
+            BEGIN
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @ViewName,
+                                              @RowsAffected = @ReturnCode,
+                                              @Action = @ActionMsg,
+                                              @ErrorCode = NULL,
+                                              @ErrorMessage = NULL;
+                PRINT 'View Maint - ' + QUOTENAME(CONCAT('vw_', @TableNamePrefix)) + ' ALTERED/CREATED.  Added: '
+                      + QUOTENAME(@TableName) + ' to view successfully.';
+            END;
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+            PRINT @SQL;
+            PRINT 'View Maint -  Error occurred while creating view: ' + @ErrorMessage;
+        END CATCH;
+    END;
+END;
+GO
+
+-- =============================================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Creates a series of tables, see addin_SvcLogTableStructures for specifications.
+--              Specs, service table size breakout (approx), to maintain logs x 16mo:
+--                < 2.5 mil/rec/mo. = Single Table.  rpt(replaces dpa)_[OrigTableName] 
+--                > 2.5 mil/rec/mo. < 6.5 = 16 tables. rpt(replaces dpa)_[OrigTableName]_[yyyy]_[mm]
+--                > 6.5 mil/rec/mo. = 25 tables. rpt(replaces dpa)_[OrigTableName]_[yyyy]_[mm]_[WeekOfYear]
+--                ** multi table sets may have 1-2 tables more than above, depending on timing.
+-- =============================================================================================================
+CREATE or ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_7.DropExpired] @Run_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @TABLE_NAME NVARCHAR(100);
+    DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+    DECLARE @ErrorNumber INT;
+    DECLARE @ErrorCode INT;
+    DECLARE @RowCNT INT;
+    DECLARE @TotalRowCount INT;
+    DECLARE @SQL NVARCHAR(MAX);
+
+    DECLARE @StartTime DATETIME2;
+    DECLARE @EndTime NVARCHAR(20);
+    DECLARE @LoadStartTime NVARCHAR(20);
+    DECLARE @LoadEndTime NVARCHAR(20);
+    DECLARE @LoadTime INT;
+    DECLARE @InsertLoadTime INT;
+
+    BEGIN TRY
+        PRINT '----------------------- Begin Drop Expired Tables -----------------------';
+        DECLARE drop_cursor CURSOR FOR
+        SELECT TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_NAME LIKE '%rpt_%'
+              AND TABLE_NAME NOT LIKE '%rpt_completed%'
+              AND TABLE_NAME NOT LIKE '%vw%'
+              AND TABLE_NAME NOT IN (
+                                        SELECT TableName FROM temp_SvcLog_1_Create
+                                    )
+        ORDER BY TABLE_NAME;
+
+        OPEN drop_cursor;
+
+        FETCH NEXT FROM drop_cursor
+        INTO @TABLE_NAME;
+
+        IF @@FETCH_STATUS < 0
+        BEGIN
+            PRINT 'Action Msg: DROP TABLE - 0 expired tables.';
+        END;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+
+
+            BEGIN TRY
+                SET @SQL = 'DROP TABLE ' + QUOTENAME(@TABLE_NAME) + ';';
+                EXEC sp_executesql @SQL, N'@RowCNT INT OUTPUT', @RowCNT = @RowCNT OUTPUT;
+                PRINT 'Action Msg: DROP TABLE ' + @TABLE_NAME + ' (expired)';
+
+                SET @TotalRowCount = @TotalRowCount + @RowCNT;
+
+                EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                              @TableAffected = @TABLE_NAME,
+                                              @RowsAffected = 0,
+                                              @Action = 'CREATE: DROP TABLE';
+            END TRY
+            BEGIN CATCH
+                SELECT @ErrorMessage = ERROR_MESSAGE(),
+                       @ErrorSeverity = ERROR_SEVERITY(),
+                       @ErrorState = ERROR_STATE();
+                PRINT 'Error occurred while extending Partition Function:';
+                PRINT 'Error ' + CAST(@ErrorSeverity AS NVARCHAR(10)) + ', State ' + CAST(@ErrorState AS NVARCHAR(10))
+                      + ': ' + @ErrorMessage;
+            END CATCH;
+
+            FETCH NEXT FROM drop_cursor
+            INTO @TABLE_NAME;
+        END;
+
+        PRINT '----------------------- End Drop Expired Tables -----------------------';
+
+        CLOSE drop_cursor;
+        DEALLOCATE drop_cursor;
+    END TRY
+    BEGIN CATCH
+        CLOSE drop_cursor;
+        DEALLOCATE drop_cursor;
+    END CATCH
+
+END;
+GO

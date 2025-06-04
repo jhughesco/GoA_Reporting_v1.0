@@ -1,0 +1,181 @@
+-- =============================================================================================================
+-- Author:		JHughes
+-- Create date: 12/2024
+-- Description:	Called by sp_SvcLog_1.Create_1.Master
+--				Creates/Alters Table Index Partitions
+-- =============================================================================================================
+CREATE OR ALTER PROCEDURE [dbo].[sp_SvcLog_1.Create_2.idxPartition]
+    @PartitionFunctionName NVARCHAR(128),
+    @PartitionSchemeName NVARCHAR(128),
+    @AddDate DATE = NULL,
+    @PartitionType INT,
+    @Run_id INT,
+    @TableName NVARCHAR(200)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @SQL NVARCHAR(MAX) = '';
+    DECLARE @CurrentMaxBoundary DATETIME;
+    DECLARE @CurrentMinBoundary DATETIME;
+    DECLARE @Interval INT;
+    DECLARE @ReturnCode INT = 0;
+    DECLARE @ErrorMessage NVARCHAR(MAX);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+
+    PRINT '------- Processing Started for ' + QUOTENAME(@TableName) + ': ' + CAST(GETDATE() as VARCHAR(20))
+          + ' -------';
+    PRINT 'idx Part Maint - Run: sp_SvcLog_Maint_2_CREATE_IndexPartitions with parameters:';
+    PRINT 'idx Part Maint - PartitionFunctionName/PartitionSchemeName: ' + @PartitionFunctionName;
+    PRINT 'idx Part Maint - Extend, AddDate: ' + ISNULL(CONVERT(VARCHAR, @AddDate, 120), 'NULL');
+
+    SET @Interval = CASE
+                        WHEN @PartitionType = 2 THEN 1
+                        ELSE 7
+                    END;
+
+    IF NOT EXISTS
+    (
+        SELECT *
+        FROM sys.partition_functions
+        WHERE name = @PartitionFunctionName
+    )
+    BEGIN
+        SET @SQL
+            = 'CREATE PARTITION FUNCTION ' + QUOTENAME(@PartitionFunctionName)
+              + '(DATETIME) AS RANGE RIGHT FOR VALUES (';
+
+        DECLARE @StartDate DATETIME = ISNULL(@AddDate, CAST(CAST(YEAR(GETDATE()) AS CHAR(4)) + '-01-01' AS DATETIME));
+        DECLARE @EndDate DATE;
+        SET @EndDate = CASE
+                           WHEN @PartitionType = 0
+                                or @PartitionType = 1 THEN DATEADD(DAY, 7, @StartDate)
+                           ELSE EOMONTH(@StartDate)
+                       END;
+
+        WHILE @StartDate < @EndDate
+        BEGIN
+            SET @SQL += '''' + CONVERT(VARCHAR, @StartDate, 120) + ''', ';
+            SET @StartDate = DATEADD(DAY, @Interval, @StartDate);
+        END
+
+        SET @SQL = LEFT(@SQL, LEN(@SQL) - 2) + ''')';
+
+        SET @SQL += '; CREATE PARTITION SCHEME ' + QUOTENAME(@PartitionSchemeName) + ' AS PARTITION '
+                    + QUOTENAME(@PartitionFunctionName) + ' ALL TO ([PRIMARY])';
+
+        BEGIN TRY
+            EXEC @ReturnCode = sp_executesql @SQL;
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: idxPart/Scheme CREATE/ALTER',
+                                          @ErrorCode = NULL,
+                                          @ErrorMessage = NULL;
+            PRINT 'idx Part Maint - Partition function and scheme created successfully.';
+        END TRY
+        BEGIN CATCH
+            SELECT @ErrorMessage = ERROR_MESSAGE(),
+                   @ErrorSeverity = ERROR_SEVERITY(),
+                   @ErrorState = ERROR_STATE();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: idxPart/Scheme CREATE/ALTER',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+            PRINT 'idx Part Maint - Error creating partition function and scheme: '
+                  + CAST(@ErrorSeverity AS NVARCHAR(10));
+            PRINT 'idx Part Maint - Error creating partition function and scheme: ' + CAST(@ErrorState AS NVARCHAR(10))
+                  + ': ' + @ErrorMessage;
+        END CATCH;
+    END
+    ELSE
+    BEGIN
+        PRINT 'idx Part Maint - Partition function already exists.';
+    END
+
+    SELECT @CurrentMaxBoundary = CONVERT(DATETIME, MAX(r.value)),
+           @CurrentMinBoundary = CONVERT(DATETIME, MIN(r.value))
+    FROM sys.partition_functions f
+        JOIN sys.partition_range_values r
+            ON f.function_id = r.function_id
+    WHERE f.name = @PartitionFunctionName;
+
+    PRINT 'idx Part Maint - Current max boundary: ' + CONVERT(VARCHAR, @CurrentMaxBoundary, 120);
+    PRINT 'idx Part Maint - Current min boundary: ' + CONVERT(VARCHAR, @CurrentMinBoundary, 120);
+
+    IF @AddDate IS NOT NULL
+       AND @AddDate > @CurrentMaxBoundary
+    BEGIN
+        PRINT 'idx Part Maint - Adding new partition boundaries.';
+
+        SET @CurrentMinBoundary = DATEADD(DAY, @Interval, @CurrentMaxBoundary); -- Start from next day after current max boundary
+
+        WHILE @CurrentMinBoundary < @AddDate
+        BEGIN
+            IF NOT EXISTS
+            (
+                SELECT 1
+                FROM sys.partition_range_values
+                WHERE function_id IN (
+                                         SELECT function_id
+                                         FROM sys.partition_functions
+                                         WHERE name = @PartitionFunctionName
+                                     )
+                      AND value = CONVERT(DATETIME, @CurrentMinBoundary)
+            )
+            BEGIN
+                SET @SQL += '
+					ALTER PARTITION SCHEME ' + QUOTENAME(@PartitionSchemeName)
+                            + ' NEXT USED [PRIMARY];
+					ALTER PARTITION FUNCTION ' + QUOTENAME(@PartitionFunctionName) + '() SPLIT RANGE ('''
+                            + CONVERT(VARCHAR, @CurrentMinBoundary, 120) + ''');';
+
+                PRINT 'idx Part Maint - New partition added for boundary: '
+                      + CONVERT(VARCHAR, @CurrentMinBoundary, 120);
+            END
+
+            SET @CurrentMinBoundary = DATEADD(DAY, @Interval, @CurrentMinBoundary);
+        END
+
+        BEGIN TRY
+            IF LEN(@SQL) > 0
+            BEGIN
+                EXEC @ReturnCode = sp_executesql @SQL;
+
+                IF @ReturnCode = 0
+                BEGIN
+                    EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                                  @TableAffected = @TableName,
+                                                  @Action = 'CREATE: idxPart/Scheme CREATE/ALTER',
+                                                  @ErrorCode = NULL,
+                                                  @ErrorMessage = NULL;
+                    PRINT 'idx Part Maint - New partitions added successfully.';
+                END;
+            END
+            ELSE
+                SELECT @ErrorMessage = ERROR_MESSAGE(),
+                       @ErrorSeverity = ERROR_SEVERITY();
+
+            EXEC dbo.sp_fnLogSPRunHistory @Run_id = @Run_id,
+                                          @TableAffected = @TableName,
+                                          @Action = 'CREATE: idxPart/Scheme CREATE/ALTER',
+                                          @ErrorCode = @ErrorSeverity,
+                                          @ErrorMessage = @ErrorMessage;
+            PRINT 'idx Part Maint - New Boundary NOT ADDED!';
+        END TRY
+        BEGIN CATCH
+            PRINT 'idx Part Maint - Error updating partition function: ' + @ErrorMessage;
+        END CATCH;
+    END
+    ELSE IF @AddDate IS NOT NULL
+            AND @AddDate <= @CurrentMaxBoundary
+    BEGIN
+        PRINT 'idx Part Maint - No new Boundary added, older than or equal to CurrentMaxBoundary.';
+    END
+
+END;
+GO
+

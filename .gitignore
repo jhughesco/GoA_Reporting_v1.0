@@ -1,0 +1,29 @@
+# Ignore tempSQL files
+*SQLQuery*.sql
+# Ignore build artifacts
+.vs/
+
+# Ignore user-specific files
+*.user
+*.userprefs
+*.jfm
+*.mdl
+
+# Ignore other unnecessary files
+*.vspscc
+*.vssscc
+*.suo
+*.sln.docstates
+*.cache
+*.cache2
+*.cache3
+*.cache4
+*.cache5
+
+# Ignore temporary files
+*.tmp
+*.bak
+*.bak2
+*.bak3
+*.bak4
+*.bak5
